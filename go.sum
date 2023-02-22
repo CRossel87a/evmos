@@ -66,8 +66,8 @@ github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 h1:UQHMgLO+TxOEl
 github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1/go.mod h1:xomTg63KZ2rFqZQzSB4Vz2SUXa1BpHTVz9L5PTmPC4E=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
-github.com/CRossel87a/tendermint v0.34.25-0.20230222091213-2d9de938971d h1:eULqPHf5J18qFv9WJ6/MP0phNfyF09w8tdbidQ3/kKM=
-github.com/CRossel87a/tendermint v0.34.25-0.20230222091213-2d9de938971d/go.mod h1:4GvyVahRjsfhtdxnP5WYFS5hkCIYqXpfk02NZlpuSXY=
+github.com/CRossel87a/tendermint v0.34.25-0.20230222093821-e16efc009a97 h1:g5GAIuMKqHrpZCOCIkDW4orAYBDyt62ePc2D+v14Ogo=
+github.com/CRossel87a/tendermint v0.34.25-0.20230222093821-e16efc009a97/go.mod h1:4GvyVahRjsfhtdxnP5WYFS5hkCIYqXpfk02NZlpuSXY=
 github.com/ChainSafe/go-schnorrkel v0.0.0-20200405005733-88cbf1b4c40d h1:nalkkPQcITbvhmL4+C4cKA87NW0tfm3Kl9VXRoPywFg=
 github.com/ChainSafe/go-schnorrkel v0.0.0-20200405005733-88cbf1b4c40d/go.mod h1:URdX5+vg25ts3aCh8H5IFZybJYKWhJHYMTnf+ULtoC4=
 github.com/DATA-DOG/go-sqlmock v1.3.3/go.mod h1:f/Ixk793poVmq4qj/V1dPUg2JEAKC73Q5eFN3EC/SaM=
