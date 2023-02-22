@@ -222,5 +222,5 @@ replace (
 	// use cosmos flavored protobufs
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 	// Informal Tendermint fork
-	github.com/tendermint/tendermint => github.com/CRossel87a/tendermint v0.34.25-0.20230222093821-e16efc009a97
+	github.com/tendermint/tendermint => github.com/CRossel87a/tendermint v0.34.25-0.20230222095527-97d2296b7ca6
 )
