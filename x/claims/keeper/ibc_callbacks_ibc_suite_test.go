@@ -12,11 +12,13 @@ import (
 	channeltypes "github.com/cosmos/ibc-go/v6/modules/core/04-channel/types"
 	ibcgotesting "github.com/cosmos/ibc-go/v6/testing"
 
-	"github.com/evmos/ethermint/tests"
-	"github.com/evmos/evmos/v11/app"
-	ibctesting "github.com/evmos/evmos/v11/ibc/testing"
-	"github.com/evmos/evmos/v11/testutil"
-	"github.com/evmos/evmos/v11/x/claims/types"
+	"github.com/evmos/evmos/v12/app"
+	ibctesting "github.com/evmos/evmos/v12/ibc/testing"
+	"github.com/evmos/evmos/v12/testutil"
+	utiltx "github.com/evmos/evmos/v12/testutil/tx"
+	"github.com/evmos/evmos/v12/utils"
+	"github.com/evmos/evmos/v12/x/claims/types"
+	inflationtypes "github.com/evmos/evmos/v12/x/inflation/types"
 )
 
 type IBCTestingSuite struct {
@@ -28,8 +30,8 @@ type IBCTestingSuite struct {
 	chainB      *ibcgotesting.TestChain // Evmos chain B
 	chainCosmos *ibcgotesting.TestChain // Cosmos chain
 
-	pathEVM    *ibcgotesting.Path // chainA (Evmos) <-->  chainB (Evmos)
-	pathCosmos *ibcgotesting.Path // chainA (Evmos) <--> chainCosmos
+	pathEVM    *ibctesting.Path // chainA (Evmos) <-->  chainB (Evmos)
+	pathCosmos *ibctesting.Path // chainA (Evmos) <--> chainCosmos
 }
 
 func (suite *IBCTestingSuite) SetupTest() {
@@ -42,11 +44,37 @@ func (suite *IBCTestingSuite) SetupTest() {
 	suite.coordinator.CommitNBlocks(suite.chainB, 2)
 	suite.coordinator.CommitNBlocks(suite.chainCosmos, 2)
 
-	claimsRecord := types.NewClaimsRecord(sdk.NewInt(10000))
-	addr := sdk.AccAddress(tests.GenerateAddress().Bytes())
-	coins := sdk.NewCoins(sdk.NewCoin("aevmos", sdk.NewInt(10000)))
+	evmosChainA := suite.chainA.App.(*app.Evmos)
+	evmosChainB := suite.chainB.App.(*app.Evmos)
 
-	err := testutil.FundModuleAccount(suite.chainB.GetContext(), suite.chainB.App.(*app.Evmos).BankKeeper, types.ModuleName, coins)
+	// Mint coins to pay tx fees
+	amt, ok := sdk.NewIntFromString("1000000000000000000000")
+	suite.Require().True(ok)
+	coinEvmos := sdk.NewCoin(utils.BaseDenom, amt)
+	coins := sdk.NewCoins(coinEvmos)
+
+	err := evmosChainA.BankKeeper.MintCoins(suite.chainA.GetContext(), inflationtypes.ModuleName, coins)
+	suite.Require().NoError(err)
+	err = evmosChainA.BankKeeper.SendCoinsFromModuleToAccount(suite.chainA.GetContext(), inflationtypes.ModuleName, suite.chainA.SenderAccount.GetAddress(), coins)
+	suite.Require().NoError(err)
+
+	err = evmosChainB.BankKeeper.MintCoins(suite.chainB.GetContext(), inflationtypes.ModuleName, coins)
+	suite.Require().NoError(err)
+	err = evmosChainB.BankKeeper.SendCoinsFromModuleToAccount(suite.chainB.GetContext(), inflationtypes.ModuleName, suite.chainB.SenderAccount.GetAddress(), coins)
+	suite.Require().NoError(err)
+
+	evmParams := evmosChainA.EvmKeeper.GetParams(suite.chainA.GetContext())
+	evmParams.EvmDenom = utils.BaseDenom
+	err = evmosChainA.EvmKeeper.SetParams(suite.chainA.GetContext(), evmParams)
+	suite.Require().NoError(err)
+	err = evmosChainB.EvmKeeper.SetParams(suite.chainB.GetContext(), evmParams)
+	suite.Require().NoError(err)
+
+	claimsRecord := types.NewClaimsRecord(sdk.NewInt(10000))
+	addr := sdk.AccAddress(utiltx.GenerateAddress().Bytes())
+	coins = sdk.NewCoins(sdk.NewCoin(utils.BaseDenom, sdk.NewInt(10000)))
+
+	err = testutil.FundModuleAccount(suite.chainB.GetContext(), suite.chainB.App.(*app.Evmos).BankKeeper, types.ModuleName, coins)
 	suite.Require().NoError(err)
 
 	suite.chainB.App.(*app.Evmos).ClaimsKeeper.SetClaimsRecord(suite.chainB.GetContext(), addr, claimsRecord)
@@ -59,17 +87,19 @@ func (suite *IBCTestingSuite) SetupTest() {
 	params := types.DefaultParams()
 	params.AirdropStartTime = suite.chainA.GetContext().BlockTime()
 	params.EnableClaims = true
-	suite.chainA.App.(*app.Evmos).ClaimsKeeper.SetParams(suite.chainA.GetContext(), params)
-	suite.chainB.App.(*app.Evmos).ClaimsKeeper.SetParams(suite.chainB.GetContext(), params)
+	err = suite.chainA.App.(*app.Evmos).ClaimsKeeper.SetParams(suite.chainA.GetContext(), params)
+	suite.Require().NoError(err)
+	err = suite.chainB.App.(*app.Evmos).ClaimsKeeper.SetParams(suite.chainB.GetContext(), params)
+	suite.Require().NoError(err)
 
 	suite.pathEVM = ibctesting.NewTransferPath(suite.chainA, suite.chainB) // clientID, connectionID, channelID empty
-	suite.coordinator.Setup(suite.pathEVM)                                 // clientID, connectionID, channelID filled
+	ibctesting.SetupPath(suite.coordinator, suite.pathEVM)                 // clientID, connectionID, channelID filled
 	suite.Require().Equal("07-tendermint-0", suite.pathEVM.EndpointA.ClientID)
 	suite.Require().Equal("connection-0", suite.pathEVM.EndpointA.ConnectionID)
 	suite.Require().Equal("channel-0", suite.pathEVM.EndpointA.ChannelID)
 
 	suite.pathCosmos = ibctesting.NewTransferPath(suite.chainA, suite.chainCosmos) // clientID, connectionID, channelID empty
-	suite.coordinator.Setup(suite.pathCosmos)                                      // clientID, connectionID, channelID filled
+	ibctesting.SetupPath(suite.coordinator, suite.pathCosmos)                      // clientID, connectionID, channelID filled
 	suite.Require().Equal("07-tendermint-1", suite.pathCosmos.EndpointA.ClientID)
 	suite.Require().Equal("connection-1", suite.pathCosmos.EndpointA.ConnectionID)
 	suite.Require().Equal("channel-1", suite.pathCosmos.EndpointA.ChannelID)
@@ -80,8 +110,8 @@ func TestIBCTestingSuite(t *testing.T) {
 }
 
 func (suite *IBCTestingSuite) TestOnAcknowledgementPacketIBC() {
-	sender := "evmos1sv9m0g7ycejwr3s369km58h5qe7xj77hvcxrms"
-	receiver := "evmos1hf0468jjpe6m6vx38s97z2qqe8ldu0njdyf625"
+	sender := "evmos1sv9m0g7ycejwr3s369km58h5qe7xj77hvcxrms"   //nolint:goconst
+	receiver := "evmos1hf0468jjpe6m6vx38s97z2qqe8ldu0njdyf625" //nolint:goconst
 
 	senderAddr, err := sdk.AccAddressFromBech32(sender)
 	suite.Require().NoError(err)
@@ -98,8 +128,8 @@ func (suite *IBCTestingSuite) TestOnAcknowledgementPacketIBC() {
 			func(_ int64) {
 				params := types.DefaultParams()
 				params.EnableClaims = false
-				suite.chainA.App.(*app.Evmos).ClaimsKeeper.SetParams(suite.chainA.GetContext(), params)
-				suite.chainB.App.(*app.Evmos).ClaimsKeeper.SetParams(suite.chainB.GetContext(), params)
+				suite.chainA.App.(*app.Evmos).ClaimsKeeper.SetParams(suite.chainA.GetContext(), params) //nolint:errcheck
+				suite.chainB.App.(*app.Evmos).ClaimsKeeper.SetParams(suite.chainB.GetContext(), params) //nolint:errcheck
 			},
 			4,
 			0,
@@ -198,8 +228,8 @@ func (suite *IBCTestingSuite) TestOnRecvPacketIBC() {
 			func(_ int64) {
 				params := types.DefaultParams()
 				params.EnableClaims = false
-				suite.chainA.App.(*app.Evmos).ClaimsKeeper.SetParams(suite.chainA.GetContext(), params)
-				suite.chainB.App.(*app.Evmos).ClaimsKeeper.SetParams(suite.chainB.GetContext(), params)
+				suite.chainA.App.(*app.Evmos).ClaimsKeeper.SetParams(suite.chainA.GetContext(), params) //nolint:errcheck
+				suite.chainB.App.(*app.Evmos).ClaimsKeeper.SetParams(suite.chainB.GetContext(), params) //nolint:errcheck
 			},
 			func() {},
 			4,
@@ -391,14 +421,15 @@ func (suite *IBCTestingSuite) TestOnRecvPacketIBC() {
 			packet := channeltypes.NewPacket(bz, 1, path.EndpointA.ChannelConfig.PortID, path.EndpointA.ChannelID, path.EndpointB.ChannelConfig.PortID, path.EndpointB.ChannelID, timeoutHeight, 0)
 
 			// send on endpointA
-			path.EndpointA.SendPacket(
+			_, err = path.EndpointA.SendPacket(
 				packet.TimeoutHeight,
 				packet.TimeoutTimestamp,
 				packet.Data,
 			)
+			suite.Require().NoError(err)
 
 			// receive on endpointB
-			err := path.EndpointB.RecvPacket(packet)
+			err = path.EndpointB.RecvPacket(packet)
 			suite.Require().NoError(err)
 
 			coin := suite.chainB.App.(*app.Evmos).BankKeeper.GetBalance(suite.chainB.GetContext(), receiverAddr, "aevmos")

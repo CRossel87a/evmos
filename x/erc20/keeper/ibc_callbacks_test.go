@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/evmos/evmos/v11/x/erc20/keeper"
+	"github.com/evmos/evmos/v12/utils"
+	"github.com/evmos/evmos/v12/x/erc20/keeper"
 
 	govtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 
@@ -14,8 +15,8 @@ import (
 	"github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
-	"github.com/evmos/ethermint/crypto/ethsecp256k1"
-	"github.com/evmos/evmos/v11/testutil"
+	"github.com/evmos/evmos/v12/crypto/ethsecp256k1"
+	"github.com/evmos/evmos/v12/testutil"
 
 	transfertypes "github.com/cosmos/ibc-go/v6/modules/apps/transfer/types"
 	clienttypes "github.com/cosmos/ibc-go/v6/modules/core/02-client/types"
@@ -23,11 +24,11 @@ import (
 	ibcgotesting "github.com/cosmos/ibc-go/v6/testing"
 	ibcmock "github.com/cosmos/ibc-go/v6/testing/mock"
 
-	"github.com/evmos/evmos/v11/contracts"
-	claimstypes "github.com/evmos/evmos/v11/x/claims/types"
-	"github.com/evmos/evmos/v11/x/erc20/types"
-	inflationtypes "github.com/evmos/evmos/v11/x/inflation/types"
-	vestingtypes "github.com/evmos/evmos/v11/x/vesting/types"
+	"github.com/evmos/evmos/v12/contracts"
+	claimstypes "github.com/evmos/evmos/v12/x/claims/types"
+	"github.com/evmos/evmos/v12/x/erc20/types"
+	inflationtypes "github.com/evmos/evmos/v12/x/inflation/types"
+	vestingtypes "github.com/evmos/evmos/v12/x/vesting/types"
 )
 
 var erc20Denom = "erc20/0xdac17f958d2ee523a2206206994597c13d831ec7"
@@ -59,7 +60,7 @@ func (suite *KeeperTestSuite) TestOnRecvPacket() {
 
 	registeredDenom := cosmosTokenBase
 	coins := sdk.NewCoins(
-		sdk.NewCoin(claimstypes.DefaultClaimsDenom, sdk.NewInt(1000)),
+		sdk.NewCoin(utils.BaseDenom, sdk.NewInt(1000)),
 		sdk.NewCoin(registeredDenom, sdk.NewInt(1000)), // some ERC20 token
 		sdk.NewCoin(ibcBase, sdk.NewInt(1000)),         // some IBC coin with a registered token pair
 	)
@@ -153,7 +154,7 @@ func (suite *KeeperTestSuite) TestOnRecvPacket() {
 			checkBalances: true,
 		},
 		{
-			name: "no-op - reciever is module account",
+			name: "no-op - receiver is module account",
 			malleate: func() {
 				secpAddr = suite.app.AccountKeeper.GetModuleAccount(suite.ctx, "erc20").GetAddress()
 				transfer := transfertypes.NewFungibleTokenPacketData(registeredDenom, "100", secpAddrCosmos, secpAddr.String(), "")
@@ -210,7 +211,7 @@ func (suite *KeeperTestSuite) TestOnRecvPacket() {
 			receiver:   ethsecpAddr,
 			expErc20s:  big.NewInt(0),
 			expCoins: sdk.NewCoins(
-				sdk.NewCoin(claimstypes.DefaultClaimsDenom, sdk.NewInt(1000)),
+				sdk.NewCoin(utils.BaseDenom, sdk.NewInt(1000)),
 				sdk.NewCoin(registeredDenom, sdk.NewInt(0)),
 				sdk.NewCoin(ibcBase, sdk.NewInt(1000)),
 			),
@@ -248,7 +249,7 @@ func (suite *KeeperTestSuite) TestOnRecvPacket() {
 			malleate: func() {
 				claimsParams := suite.app.ClaimsKeeper.GetParams(suite.ctx)
 				claimsParams.EVMChannels = []string{evmosChannel}
-				suite.app.ClaimsKeeper.SetParams(suite.ctx, claimsParams)
+				suite.app.ClaimsKeeper.SetParams(suite.ctx, claimsParams) //nolint:errcheck
 
 				sourcePrefix := transfertypes.GetDenomPrefix(transfertypes.PortID, sourceChannel)
 				prefixedDenom := sourcePrefix + registeredDenom
@@ -261,7 +262,7 @@ func (suite *KeeperTestSuite) TestOnRecvPacket() {
 			checkBalances: true,
 			expErc20s:     big.NewInt(1000),
 			expCoins: sdk.NewCoins(
-				sdk.NewCoin(claimstypes.DefaultClaimsDenom, sdk.NewInt(1000)),
+				sdk.NewCoin(utils.BaseDenom, sdk.NewInt(1000)),
 				sdk.NewCoin(registeredDenom, sdk.NewInt(0)),
 				sdk.NewCoin(ibcBase, sdk.NewInt(1000)),
 			),
@@ -282,7 +283,7 @@ func (suite *KeeperTestSuite) TestOnRecvPacket() {
 			expErc20s:     big.NewInt(1000),
 			checkBalances: true,
 			expCoins: sdk.NewCoins(
-				sdk.NewCoin(claimstypes.DefaultClaimsDenom, sdk.NewInt(1000)),
+				sdk.NewCoin(utils.BaseDenom, sdk.NewInt(1000)),
 				sdk.NewCoin(registeredDenom, sdk.NewInt(0)),
 				sdk.NewCoin(ibcBase, sdk.NewInt(1000)),
 			),
@@ -308,7 +309,7 @@ func (suite *KeeperTestSuite) TestOnRecvPacket() {
 			expErc20s:     big.NewInt(1000),
 			expCoins: sdk.NewCoins(
 				sdk.NewCoin(ibcBase, sdk.NewInt(1000)),
-				sdk.NewCoin(claimstypes.DefaultClaimsDenom, sdk.NewInt(1000)),
+				sdk.NewCoin(utils.BaseDenom, sdk.NewInt(1000)),
 				sdk.NewCoin(registeredDenom, sdk.NewInt(0)),
 			),
 		},
@@ -362,7 +363,7 @@ func (suite *KeeperTestSuite) TestOnRecvPacket() {
 			if tc.disableERC20 {
 				params := suite.app.Erc20Keeper.GetParams(suite.ctx)
 				params.EnableErc20 = false
-				suite.app.Erc20Keeper.SetParams(suite.ctx, params)
+				suite.app.Erc20Keeper.SetParams(suite.ctx, params) //nolint:errcheck
 			}
 
 			if tc.disableTokenPair {
@@ -424,7 +425,7 @@ func (suite *KeeperTestSuite) TestConvertCoinToERC20FromPacket() {
 
 				params := suite.app.Erc20Keeper.GetParams(suite.ctx)
 				params.EnableErc20 = false
-				suite.app.Erc20Keeper.SetParams(suite.ctx, params)
+				_ = suite.app.Erc20Keeper.SetParams(suite.ctx, params)
 				return transfertypes.NewFungibleTokenPacketData(pair.Denom, "10", senderAddr, "", "")
 			},
 			expPass: true,

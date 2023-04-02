@@ -18,17 +18,16 @@ package keeper
 
 import (
 	"bytes"
-	// nolint: typecheck
 	"math/big"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
-	evmtypes "github.com/evmos/ethermint/x/evm/types"
+	evmtypes "github.com/evmos/evmos/v12/x/evm/types"
 
-	"github.com/evmos/evmos/v11/contracts"
-	"github.com/evmos/evmos/v11/x/erc20/types"
+	"github.com/evmos/evmos/v12/contracts"
+	"github.com/evmos/evmos/v12/x/erc20/types"
 )
 
 var _ evmtypes.EvmHooks = Hooks{}
@@ -62,7 +61,7 @@ func (h Hooks) PostTxProcessing(ctx sdk.Context, msg core.Message, receipt *etht
 // `ConvertERC20` msg does not trigger the hook as it only calls `ApplyMessage`.
 func (k Keeper) PostTxProcessing(
 	ctx sdk.Context,
-	msg core.Message,
+	_ core.Message,
 	receipt *ethtypes.Receipt,
 ) error {
 	params := k.GetParams(ctx)

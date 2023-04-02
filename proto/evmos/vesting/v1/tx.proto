@@ -6,7 +6,7 @@ import "gogoproto/gogo.proto";
 import "google/api/annotations.proto";
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/evmos/evmos/v11/x/vesting/types";
+option go_package = "github.com/evmos/evmos/v12/x/vesting/types";
 
 // Msg defines the vesting Msg service.
 service Msg {
@@ -23,6 +23,10 @@ service Msg {
   // ClawbackVestingAccount.
   rpc UpdateVestingFunder(MsgUpdateVestingFunder) returns (MsgUpdateVestingFunderResponse) {
     option (google.api.http).get = "/evmos/vesting/v1/tx/update_vesting_funder";
+  };
+  // ConvertVestingAccount converts a ClawbackVestingAccount to a Eth account
+  rpc ConvertVestingAccount(MsgConvertVestingAccount) returns (MsgConvertVestingAccountResponse) {
+    option (google.api.http).get = "/evmos/vesting/v1/tx/convert_vesting_account";
   };
 }
 
@@ -91,3 +95,12 @@ message MsgUpdateVestingFunder {
 // MsgUpdateVestingFunderResponse defines the MsgUpdateVestingFunder response
 // type.
 message MsgUpdateVestingFunderResponse {}
+
+// MsgConvertVestingAccount defines a message that enables converting a vesting account to a eth account
+message MsgConvertVestingAccount {
+  // vesting_address is the address of the vesting account to convert
+  string vesting_address = 1;
+}
+
+// MsgConvertVestingAccountResponse defines the MsgConvertVestingAccount response type.
+message MsgConvertVestingAccountResponse {}

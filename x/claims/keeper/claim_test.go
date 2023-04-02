@@ -12,13 +12,13 @@ import (
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/evmos/ethermint/crypto/ethsecp256k1"
-	"github.com/evmos/ethermint/tests"
-	ethermint "github.com/evmos/ethermint/types"
-	"github.com/evmos/evmos/v11/testutil"
-	inflationtypes "github.com/evmos/evmos/v11/x/inflation/types"
+	"github.com/evmos/evmos/v12/crypto/ethsecp256k1"
+	"github.com/evmos/evmos/v12/testutil"
+	utiltx "github.com/evmos/evmos/v12/testutil/tx"
+	evmostypes "github.com/evmos/evmos/v12/types"
+	inflationtypes "github.com/evmos/evmos/v12/x/inflation/types"
 
-	"github.com/evmos/evmos/v11/x/claims/types"
+	"github.com/evmos/evmos/v12/x/claims/types"
 )
 
 func (suite *KeeperTestSuite) TestGetClaimableAmountForAction() {
@@ -106,7 +106,7 @@ func (suite *KeeperTestSuite) TestGetClaimableAmountForAction() {
 }
 
 func (suite *KeeperTestSuite) TestGetUserTotalClaimable() {
-	addr := sdk.AccAddress(tests.GenerateAddress().Bytes())
+	addr := sdk.AccAddress(utiltx.GenerateAddress().Bytes())
 
 	testCases := []struct {
 		name     string
@@ -132,7 +132,8 @@ func (suite *KeeperTestSuite) TestGetUserTotalClaimable() {
 				cr := types.NewClaimsRecord(sdk.NewInt(100))
 				params := suite.app.ClaimsKeeper.GetParams(suite.ctx)
 				params.AirdropStartTime = suite.ctx.BlockTime().Add(-time.Minute)
-				suite.app.ClaimsKeeper.SetParams(suite.ctx, params)
+				err := suite.app.ClaimsKeeper.SetParams(suite.ctx, params)
+				suite.Require().NoError(err)
 				suite.app.ClaimsKeeper.SetClaimsRecord(suite.ctx, addr, cr)
 			},
 			sdk.NewInt(100),
@@ -143,7 +144,7 @@ func (suite *KeeperTestSuite) TestGetUserTotalClaimable() {
 				cr := types.NewClaimsRecord(sdk.NewInt(100))
 				params := suite.app.ClaimsKeeper.GetParams(suite.ctx)
 				params.EnableClaims = false
-				suite.app.ClaimsKeeper.SetParams(suite.ctx, params)
+				suite.app.ClaimsKeeper.SetParams(suite.ctx, params) //nolint:errcheck
 				suite.app.ClaimsKeeper.SetClaimsRecord(suite.ctx, addr, cr)
 			},
 			sdk.ZeroInt(),
@@ -156,7 +157,7 @@ func (suite *KeeperTestSuite) TestGetUserTotalClaimable() {
 				params.AirdropStartTime = params.AirdropStartTime.Add(-time.Hour)
 				params.DurationUntilDecay = 30 * time.Minute
 				params.DurationOfDecay = time.Hour
-				suite.app.ClaimsKeeper.SetParams(suite.ctx, params)
+				suite.app.ClaimsKeeper.SetParams(suite.ctx, params) //nolint:errcheck
 				suite.app.ClaimsKeeper.SetClaimsRecord(suite.ctx, addr, cr)
 			},
 			sdk.NewInt(100),
@@ -176,7 +177,7 @@ func (suite *KeeperTestSuite) TestGetUserTotalClaimable() {
 }
 
 func (suite *KeeperTestSuite) TestClaimCoinsForAction() {
-	addr := sdk.AccAddress(tests.GenerateAddress().Bytes())
+	addr := sdk.AccAddress(utiltx.GenerateAddress().Bytes())
 
 	testCases := []struct {
 		name            string
@@ -425,7 +426,7 @@ func (suite *KeeperTestSuite) TestClaimCoinsForAction() {
 }
 
 func (suite *KeeperTestSuite) TestMergeClaimRecords() {
-	recipient := sdk.AccAddress(tests.GenerateAddress().Bytes())
+	recipient := sdk.AccAddress(utiltx.GenerateAddress().Bytes())
 
 	params := types.Params{
 		EnableClaims:       true,
@@ -578,10 +579,11 @@ func (suite *KeeperTestSuite) TestMergeClaimRecords() {
 					DurationOfDecay:    time.Hour,
 					ClaimsDenom:        types.DefaultClaimsDenom,
 				}
-				suite.app.ClaimsKeeper.SetParams(suite.ctx, params)
+				err := suite.app.ClaimsKeeper.SetParams(suite.ctx, params)
+				suite.Require().NoError(err)
 
 				coins := sdk.Coins{sdk.NewCoin(params.ClaimsDenom, sdk.NewInt(50))}
-				err := testutil.FundModuleAccount(suite.ctx, suite.app.BankKeeper, types.ModuleName, coins)
+				err = testutil.FundModuleAccount(suite.ctx, suite.app.BankKeeper, types.ModuleName, coins)
 				suite.Require().NoError(err)
 
 				_, err = suite.app.ClaimsKeeper.MergeClaimsRecords(suite.ctx, recipient, senderClaimsRecord, recipientClaimsRecord, params)
@@ -594,7 +596,7 @@ func (suite *KeeperTestSuite) TestMergeClaimRecords() {
 		suite.Run(fmt.Sprintf("Case %s", tc.name), func() {
 			suite.SetupTest() // reset
 
-			suite.app.ClaimsKeeper.SetParams(suite.ctx, params)
+			suite.app.ClaimsKeeper.SetParams(suite.ctx, params) //nolint:errcheck // this will run through many test cases and we don't know if we want error or not
 
 			tc.test()
 		})
@@ -603,7 +605,7 @@ func (suite *KeeperTestSuite) TestMergeClaimRecords() {
 
 func (suite *KeeperTestSuite) TestHookOfUnclaimableAccount() {
 	suite.SetupTestWithEscrow()
-	addr1 := sdk.AccAddress(tests.GenerateAddress().Bytes())
+	addr1 := sdk.AccAddress(utiltx.GenerateAddress().Bytes())
 	suite.app.AccountKeeper.SetAccount(suite.ctx, authtypes.NewBaseAccount(addr1, nil, 0, 0))
 
 	params := suite.app.ClaimsKeeper.GetParams(suite.ctx)
@@ -625,9 +627,10 @@ func (suite *KeeperTestSuite) TestHookBeforeAirdropStart() {
 	airdropStartTime := suite.ctx.BlockTime().Add(time.Hour)
 	params := suite.app.ClaimsKeeper.GetParams(suite.ctx)
 	params.AirdropStartTime = airdropStartTime
-	suite.app.ClaimsKeeper.SetParams(suite.ctx, params)
+	err := suite.app.ClaimsKeeper.SetParams(suite.ctx, params)
+	suite.Require().NoError(err)
 
-	addr1 := sdk.AccAddress(tests.GenerateAddress().Bytes())
+	addr1 := sdk.AccAddress(utiltx.GenerateAddress().Bytes())
 
 	claimsRecord := types.NewClaimsRecord(sdk.NewInt(1000))
 	acc := suite.app.AccountKeeper.NewAccountWithAddress(suite.ctx, addr1)
@@ -664,7 +667,7 @@ func (suite *KeeperTestSuite) TestHookAfterAirdropEnd() {
 	suite.SetupTestWithEscrow()
 
 	// airdrop recipient address
-	addr1 := sdk.AccAddress(tests.GenerateAddress().Bytes())
+	addr1 := sdk.AccAddress(utiltx.GenerateAddress().Bytes())
 
 	claimsRecord := types.ClaimsRecord{
 		InitialClaimableAmount: sdk.NewInt(1000),
@@ -686,7 +689,7 @@ func (suite *KeeperTestSuite) TestHookAfterAirdropEnd() {
 
 func (suite *KeeperTestSuite) TestDuplicatedActionNotWithdrawRepeatedly() {
 	suite.SetupTestWithEscrow()
-	addr1 := sdk.AccAddress(tests.GenerateAddress().Bytes())
+	addr1 := sdk.AccAddress(utiltx.GenerateAddress().Bytes())
 
 	params := suite.app.ClaimsKeeper.GetParams(suite.ctx)
 
@@ -754,10 +757,11 @@ func (suite *KeeperTestSuite) TestDelegationAutoWithdrawAndDelegateMore() {
 	validator, err := stakingtypes.NewValidator(sdk.ValAddress(addrs[0]), pub1.PubKey(), stakingtypes.Description{})
 	suite.Require().NoError(err)
 	validator = stakingkeeper.TestingUpdateValidator(suite.app.StakingKeeper, suite.ctx, validator, true)
-	suite.app.StakingKeeper.AfterValidatorCreated(suite.ctx, validator.GetOperator())
+	err = suite.app.StakingKeeper.AfterValidatorCreated(suite.ctx, validator.GetOperator())
+	suite.Require().NoError(err)
 
-	validator, _ = validator.AddTokensFromDel(sdk.TokensFromConsensusPower(1, ethermint.PowerReduction))
-	delAmount := sdk.TokensFromConsensusPower(1, ethermint.PowerReduction)
+	validator, _ = validator.AddTokensFromDel(sdk.TokensFromConsensusPower(1, evmostypes.PowerReduction))
+	delAmount := sdk.TokensFromConsensusPower(1, evmostypes.PowerReduction)
 
 	err = testutil.FundAccount(suite.ctx, suite.app.BankKeeper, addrs[1], sdk.NewCoins(sdk.NewCoin(params.GetClaimsDenom(), delAmount)))
 	suite.Require().NoError(err)
@@ -779,8 +783,8 @@ func (suite *KeeperTestSuite) TestAirdropFlow() {
 	suite.SetupTestWithEscrow()
 
 	addrs := []sdk.AccAddress{
-		sdk.AccAddress(tests.GenerateAddress().Bytes()),
-		sdk.AccAddress(tests.GenerateAddress().Bytes()),
+		sdk.AccAddress(utiltx.GenerateAddress().Bytes()),
+		sdk.AccAddress(utiltx.GenerateAddress().Bytes()),
 	}
 
 	claimsRecords := []types.ClaimsRecord{
@@ -808,7 +812,7 @@ func (suite *KeeperTestSuite) TestAirdropFlow() {
 	coins2 := suite.getUserTotalClaimable(suite.ctx, addrs[1])
 	suite.Require().Equal(coins2, claimsRecords[1].InitialClaimableAmount)
 
-	coins3 := suite.getUserTotalClaimable(suite.ctx, sdk.AccAddress(tests.GenerateAddress().Bytes()))
+	coins3 := suite.getUserTotalClaimable(suite.ctx, sdk.AccAddress(utiltx.GenerateAddress().Bytes()))
 	suite.Require().True(coins3.IsZero())
 
 	// get rewards amount per action
@@ -881,13 +885,14 @@ func (suite *KeeperTestSuite) TestClaimOfDecayed() {
 	durationUntilDecay := time.Hour
 	durationOfDecay := time.Hour * 4
 
-	addr1 := sdk.AccAddress(tests.GenerateAddress().Bytes())
+	addr1 := sdk.AccAddress(utiltx.GenerateAddress().Bytes())
 
 	params := suite.app.ClaimsKeeper.GetParams(suite.ctx)
 	params.AirdropStartTime = airdropStartTime
 	params.DurationUntilDecay = durationUntilDecay
 	params.DurationOfDecay = durationOfDecay
-	suite.app.ClaimsKeeper.SetParams(suite.ctx, params)
+	err := suite.app.ClaimsKeeper.SetParams(suite.ctx, params)
+	suite.Require().NoError(err)
 
 	var claimsRecord types.ClaimsRecord
 
@@ -963,7 +968,7 @@ func (suite *KeeperTestSuite) TestClaimOfDecayed() {
 			ActionsCompleted:       []bool{false, false, false, false},
 		}
 
-		suite.app.ClaimsKeeper.SetParams(suite.ctx, types.Params{
+		suite.app.ClaimsKeeper.SetParams(suite.ctx, types.Params{ //nolint:errcheck
 			AirdropStartTime:   airdropStartTime,
 			DurationUntilDecay: durationUntilDecay,
 			DurationOfDecay:    durationOfDecay,
@@ -999,7 +1004,7 @@ func (suite *KeeperTestSuite) TestClawbackEscrowedTokens() {
 	suite.Require().Equal(bal.Amount, sdk.ZeroInt())
 
 	// claim some amount from airdrop
-	addr1 := sdk.AccAddress(tests.GenerateAddress().Bytes())
+	addr1 := sdk.AccAddress(utiltx.GenerateAddress().Bytes())
 	initClaim := sdk.NewInt(1000)
 	claimsRecord := types.ClaimsRecord{
 		InitialClaimableAmount: initClaim,
@@ -1013,7 +1018,8 @@ func (suite *KeeperTestSuite) TestClawbackEscrowedTokens() {
 	suite.Require().Equal(coins.AmountOf(params.GetClaimsDenom()), escrow.Sub(claimedCoins))
 
 	// End the airdrop
-	suite.app.ClaimsKeeper.EndAirdrop(ctx, params)
+	err = suite.app.ClaimsKeeper.EndAirdrop(ctx, params)
+	suite.Require().NoError(err)
 
 	// Make sure no one can claim after airdrop ends
 	claimedCoinsAfter, err := suite.app.ClaimsKeeper.ClaimCoinsForAction(ctx, addr1, claimsRecord, types.ActionDelegate, params)
@@ -1071,7 +1077,7 @@ func (suite *KeeperTestSuite) TestClawbackEmptyAccountsAirdrop() {
 		addr, err := sdk.AccAddressFromBech32(tc.address)
 		suite.Require().NoError(err, tc.name)
 
-		acc := &ethermint.EthAccount{
+		acc := &evmostypes.EthAccount{
 			BaseAccount: authtypes.NewBaseAccount(sdk.AccAddress(addr.Bytes()), nil, 0, 0),
 			CodeHash:    common.BytesToHash(crypto.Keccak256(nil)).String(),
 		}

@@ -12,12 +12,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/evmos/ethermint/tests"
-	evmtypes "github.com/evmos/ethermint/x/evm/types"
+	utiltx "github.com/evmos/evmos/v12/testutil/tx"
+	evmtypes "github.com/evmos/evmos/v12/x/evm/types"
 
-	"github.com/evmos/evmos/v11/x/erc20/keeper"
-	"github.com/evmos/evmos/v11/x/erc20/types"
-	inflationtypes "github.com/evmos/evmos/v11/x/inflation/types"
+	"github.com/evmos/evmos/v12/x/erc20/keeper"
+	"github.com/evmos/evmos/v12/x/erc20/types"
+	inflationtypes "github.com/evmos/evmos/v12/x/inflation/types"
 )
 
 const (
@@ -75,19 +75,23 @@ var (
 )
 
 func (suite *KeeperTestSuite) setupRegisterERC20Pair(contractType int) common.Address {
-	var contract common.Address
+	var (
+		contract common.Address
+		err      error
+	)
 	// Deploy contract
 	switch contractType {
 	case contractDirectBalanceManipulation:
-		contract = suite.DeployContractDirectBalanceManipulation(erc20Name, erc20Symbol)
+		contract, err = suite.DeployContractDirectBalanceManipulation()
 	case contractMaliciousDelayed:
-		contract = suite.DeployContractMaliciousDelayed(erc20Name, erc20Symbol)
+		contract, err = suite.DeployContractMaliciousDelayed()
 	default:
-		contract, _ = suite.DeployContract(erc20Name, erc20Symbol, erc20Decimals)
+		contract, err = suite.DeployContract(erc20Name, erc20Symbol, erc20Decimals)
 	}
+	suite.Require().NoError(err)
 	suite.Commit()
 
-	_, err := suite.app.Erc20Keeper.RegisterERC20(suite.ctx, contract)
+	_, err = suite.app.Erc20Keeper.RegisterERC20(suite.ctx, contract)
 	suite.Require().NoError(err)
 	return contract
 }
@@ -103,7 +107,7 @@ func (suite *KeeperTestSuite) setupRegisterCoin(metadata banktypes.Metadata) *ty
 	return pair
 }
 
-func (suite KeeperTestSuite) TestRegisterCoin() {
+func (suite KeeperTestSuite) TestRegisterCoin() { //nolint:govet // we can copy locks here because it is a test
 	metadata := banktypes.Metadata{
 		Description: "description",
 		Base:        cosmosTokenBase,
@@ -133,14 +137,14 @@ func (suite KeeperTestSuite) TestRegisterCoin() {
 			func() {
 				params := types.DefaultParams()
 				params.EnableErc20 = false
-				suite.app.Erc20Keeper.SetParams(suite.ctx, params)
+				suite.app.Erc20Keeper.SetParams(suite.ctx, params) //nolint:errcheck
 			},
 			false,
 		},
 		{
 			"denom already registered",
 			func() {
-				regPair := types.NewTokenPair(tests.GenerateAddress(), metadata.Base, true, types.OWNER_MODULE)
+				regPair := types.NewTokenPair(utiltx.GenerateAddress(), metadata.Base, types.OWNER_MODULE)
 				suite.app.Erc20Keeper.SetDenomMap(suite.ctx, regPair.Denom, regPair.GetID())
 				suite.Commit()
 			},
@@ -248,7 +252,7 @@ func (suite KeeperTestSuite) TestRegisterCoin() {
 	}
 }
 
-func (suite KeeperTestSuite) TestRegisterERC20() {
+func (suite KeeperTestSuite) TestRegisterERC20() { //nolint:govet // we can copy locks here because it is a test
 	var (
 		contractAddr common.Address
 		pair         types.TokenPair
@@ -275,7 +279,7 @@ func (suite KeeperTestSuite) TestRegisterERC20() {
 		{
 			"meta data already stored",
 			func() {
-				suite.app.Erc20Keeper.CreateCoinMetadata(suite.ctx, contractAddr)
+				suite.app.Erc20Keeper.CreateCoinMetadata(suite.ctx, contractAddr) //nolint:errcheck
 			},
 			false,
 		},
@@ -302,14 +306,14 @@ func (suite KeeperTestSuite) TestRegisterERC20() {
 	}
 	for _, tc := range testCases {
 		suite.Run(fmt.Sprintf("Case %s", tc.name), func() {
+			var err error
 			suite.SetupTest() // reset
 
-			var err error
 			contractAddr, err = suite.DeployContract(erc20Name, erc20Symbol, cosmosDecimals)
 			suite.Require().NoError(err)
-			suite.Commit()
+
 			coinName := types.CreateDenom(contractAddr.String())
-			pair = types.NewTokenPair(contractAddr, coinName, true, types.OWNER_EXTERNAL)
+			pair = types.NewTokenPair(contractAddr, coinName, types.OWNER_EXTERNAL)
 
 			tc.malleate()
 
@@ -326,7 +330,7 @@ func (suite KeeperTestSuite) TestRegisterERC20() {
 				// Denom units
 				suite.Require().Equal(len(metadata.DenomUnits), 2)
 				suite.Require().Equal(coinName, metadata.DenomUnits[0].Denom)
-				suite.Require().Equal(uint32(zeroExponent), metadata.DenomUnits[0].Exponent)
+				suite.Require().Equal(zeroExponent, metadata.DenomUnits[0].Exponent)
 				suite.Require().Equal(types.SanitizeERC20Name(erc20Name), metadata.DenomUnits[1].Denom)
 				// Custom exponent at contract creation matches coin with token
 				suite.Require().Equal(metadata.DenomUnits[1].Exponent, uint32(cosmosDecimals))
@@ -337,7 +341,7 @@ func (suite KeeperTestSuite) TestRegisterERC20() {
 	}
 }
 
-func (suite KeeperTestSuite) TestToggleConverision() {
+func (suite KeeperTestSuite) TestToggleConverision() { //nolint:govet // we can copy locks here because it is a test
 	var (
 		contractAddr common.Address
 		id           []byte
@@ -356,7 +360,7 @@ func (suite KeeperTestSuite) TestToggleConverision() {
 				contractAddr, err := suite.DeployContract(erc20Name, erc20Symbol, erc20Decimals)
 				suite.Require().NoError(err)
 				suite.Commit()
-				pair = types.NewTokenPair(contractAddr, cosmosTokenBase, true, types.OWNER_MODULE)
+				pair = types.NewTokenPair(contractAddr, cosmosTokenBase, types.OWNER_MODULE)
 			},
 			false,
 			false,
@@ -367,7 +371,7 @@ func (suite KeeperTestSuite) TestToggleConverision() {
 				contractAddr, err := suite.DeployContract(erc20Name, erc20Symbol, erc20Decimals)
 				suite.Require().NoError(err)
 				suite.Commit()
-				pair = types.NewTokenPair(contractAddr, cosmosTokenBase, true, types.OWNER_MODULE)
+				pair = types.NewTokenPair(contractAddr, cosmosTokenBase, types.OWNER_MODULE)
 				suite.app.Erc20Keeper.SetERC20Map(suite.ctx, common.HexToAddress(pair.Erc20Address), pair.GetID())
 			},
 			false,

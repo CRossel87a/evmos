@@ -54,6 +54,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/version"
 	"github.com/cosmos/cosmos-sdk/x/auth"
 	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
+	"github.com/cosmos/cosmos-sdk/x/auth/posthandler"
 	authsims "github.com/cosmos/cosmos-sdk/x/auth/simulation"
 	authtx "github.com/cosmos/cosmos-sdk/x/auth/tx"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
@@ -122,59 +123,64 @@ import (
 	icahosttypes "github.com/cosmos/ibc-go/v6/modules/apps/27-interchain-accounts/host/types"
 	icatypes "github.com/cosmos/ibc-go/v6/modules/apps/27-interchain-accounts/types"
 
-	"github.com/evmos/ethermint/encoding"
-	"github.com/evmos/ethermint/ethereum/eip712"
-	srvflags "github.com/evmos/ethermint/server/flags"
-	ethermint "github.com/evmos/ethermint/types"
-	"github.com/evmos/ethermint/x/evm"
-	evmkeeper "github.com/evmos/ethermint/x/evm/keeper"
-	evmtypes "github.com/evmos/ethermint/x/evm/types"
-	"github.com/evmos/ethermint/x/evm/vm/geth"
-	"github.com/evmos/ethermint/x/feemarket"
-	feemarketkeeper "github.com/evmos/ethermint/x/feemarket/keeper"
-	feemarkettypes "github.com/evmos/ethermint/x/feemarket/types"
+	ethante "github.com/evmos/evmos/v12/app/ante/evm"
+	"github.com/evmos/evmos/v12/encoding"
+	"github.com/evmos/evmos/v12/ethereum/eip712"
+	srvflags "github.com/evmos/evmos/v12/server/flags"
+	evmostypes "github.com/evmos/evmos/v12/types"
+	"github.com/evmos/evmos/v12/x/evm"
+	evmkeeper "github.com/evmos/evmos/v12/x/evm/keeper"
+	evmtypes "github.com/evmos/evmos/v12/x/evm/types"
+	"github.com/evmos/evmos/v12/x/feemarket"
+	feemarketkeeper "github.com/evmos/evmos/v12/x/feemarket/keeper"
+	feemarkettypes "github.com/evmos/evmos/v12/x/feemarket/types"
 
 	// unnamed import of statik for swagger UI support
-	_ "github.com/evmos/evmos/v11/client/docs/statik"
+	_ "github.com/evmos/evmos/v12/client/docs/statik"
 
-	"github.com/evmos/evmos/v11/app/ante"
-	v10 "github.com/evmos/evmos/v11/app/upgrades/v10"
-	v11 "github.com/evmos/evmos/v11/app/upgrades/v11"
-	v8 "github.com/evmos/evmos/v11/app/upgrades/v8"
-	v81 "github.com/evmos/evmos/v11/app/upgrades/v8_1"
-	v82 "github.com/evmos/evmos/v11/app/upgrades/v8_2"
-	v9 "github.com/evmos/evmos/v11/app/upgrades/v9"
-	v91 "github.com/evmos/evmos/v11/app/upgrades/v9_1"
-	"github.com/evmos/evmos/v11/x/claims"
-	claimskeeper "github.com/evmos/evmos/v11/x/claims/keeper"
-	claimstypes "github.com/evmos/evmos/v11/x/claims/types"
-	"github.com/evmos/evmos/v11/x/epochs"
-	epochskeeper "github.com/evmos/evmos/v11/x/epochs/keeper"
-	epochstypes "github.com/evmos/evmos/v11/x/epochs/types"
-	"github.com/evmos/evmos/v11/x/erc20"
-	erc20client "github.com/evmos/evmos/v11/x/erc20/client"
-	erc20keeper "github.com/evmos/evmos/v11/x/erc20/keeper"
-	erc20types "github.com/evmos/evmos/v11/x/erc20/types"
-	"github.com/evmos/evmos/v11/x/incentives"
-	incentivesclient "github.com/evmos/evmos/v11/x/incentives/client"
-	incentiveskeeper "github.com/evmos/evmos/v11/x/incentives/keeper"
-	incentivestypes "github.com/evmos/evmos/v11/x/incentives/types"
-	"github.com/evmos/evmos/v11/x/inflation"
-	inflationkeeper "github.com/evmos/evmos/v11/x/inflation/keeper"
-	inflationtypes "github.com/evmos/evmos/v11/x/inflation/types"
-	"github.com/evmos/evmos/v11/x/recovery"
-	recoverykeeper "github.com/evmos/evmos/v11/x/recovery/keeper"
-	recoverytypes "github.com/evmos/evmos/v11/x/recovery/types"
-	"github.com/evmos/evmos/v11/x/revenue"
-	revenuekeeper "github.com/evmos/evmos/v11/x/revenue/keeper"
-	revenuetypes "github.com/evmos/evmos/v11/x/revenue/types"
-	"github.com/evmos/evmos/v11/x/vesting"
-	vestingkeeper "github.com/evmos/evmos/v11/x/vesting/keeper"
-	vestingtypes "github.com/evmos/evmos/v11/x/vesting/types"
+	"github.com/evmos/evmos/v12/app/ante"
+	v10 "github.com/evmos/evmos/v12/app/upgrades/v10"
+	v11 "github.com/evmos/evmos/v12/app/upgrades/v11"
+	v12 "github.com/evmos/evmos/v12/app/upgrades/v12"
+	v8 "github.com/evmos/evmos/v12/app/upgrades/v8"
+	v81 "github.com/evmos/evmos/v12/app/upgrades/v8_1"
+	v82 "github.com/evmos/evmos/v12/app/upgrades/v8_2"
+	v9 "github.com/evmos/evmos/v12/app/upgrades/v9"
+	v91 "github.com/evmos/evmos/v12/app/upgrades/v9_1"
+	"github.com/evmos/evmos/v12/x/claims"
+	claimskeeper "github.com/evmos/evmos/v12/x/claims/keeper"
+	claimstypes "github.com/evmos/evmos/v12/x/claims/types"
+	"github.com/evmos/evmos/v12/x/epochs"
+	epochskeeper "github.com/evmos/evmos/v12/x/epochs/keeper"
+	epochstypes "github.com/evmos/evmos/v12/x/epochs/types"
+	"github.com/evmos/evmos/v12/x/erc20"
+	erc20client "github.com/evmos/evmos/v12/x/erc20/client"
+	erc20keeper "github.com/evmos/evmos/v12/x/erc20/keeper"
+	erc20types "github.com/evmos/evmos/v12/x/erc20/types"
+	"github.com/evmos/evmos/v12/x/incentives"
+	incentivesclient "github.com/evmos/evmos/v12/x/incentives/client"
+	incentiveskeeper "github.com/evmos/evmos/v12/x/incentives/keeper"
+	incentivestypes "github.com/evmos/evmos/v12/x/incentives/types"
+	"github.com/evmos/evmos/v12/x/inflation"
+	inflationkeeper "github.com/evmos/evmos/v12/x/inflation/keeper"
+	inflationtypes "github.com/evmos/evmos/v12/x/inflation/types"
+	"github.com/evmos/evmos/v12/x/recovery"
+	recoverykeeper "github.com/evmos/evmos/v12/x/recovery/keeper"
+	recoverytypes "github.com/evmos/evmos/v12/x/recovery/types"
+	revenue "github.com/evmos/evmos/v12/x/revenue/v1"
+	revenuekeeper "github.com/evmos/evmos/v12/x/revenue/v1/keeper"
+	revenuetypes "github.com/evmos/evmos/v12/x/revenue/v1/types"
+	"github.com/evmos/evmos/v12/x/vesting"
+	vestingkeeper "github.com/evmos/evmos/v12/x/vesting/keeper"
+	vestingtypes "github.com/evmos/evmos/v12/x/vesting/types"
 
 	// NOTE: override ICS20 keeper to support IBC transfers of ERC20 tokens
-	"github.com/evmos/evmos/v11/x/ibc/transfer"
-	transferkeeper "github.com/evmos/evmos/v11/x/ibc/transfer/keeper"
+	"github.com/evmos/evmos/v12/x/ibc/transfer"
+	transferkeeper "github.com/evmos/evmos/v12/x/ibc/transfer/keeper"
+
+	// Force-load the tracer engines to trigger registration due to Go-Ethereum v1.10.15 changes
+	_ "github.com/ethereum/go-ethereum/eth/tracers/js"
+	_ "github.com/ethereum/go-ethereum/eth/tracers/native"
 )
 
 func init() {
@@ -186,7 +192,7 @@ func init() {
 	DefaultNodeHome = filepath.Join(userHomeDir, ".evmosd")
 
 	// manually update the power reduction by replacing micro (u) -> atto (a) evmos
-	sdk.DefaultPowerReduction = ethermint.PowerReduction
+	sdk.DefaultPowerReduction = evmostypes.PowerReduction
 	// modify fee market parameter defaults through global
 	feemarkettypes.DefaultMinGasPrice = MainnetMinGasPrices
 	feemarkettypes.DefaultMinGasMultiplier = MainnetMinGasMultiplier
@@ -260,7 +266,6 @@ var (
 
 	// module accounts that are allowed to receive tokens
 	allowedReceivingModAcc = map[string]bool{
-		distrtypes.ModuleName:      true,
 		incentivestypes.ModuleName: true,
 	}
 )
@@ -422,7 +427,7 @@ func NewEvmos(
 
 	// use custom Ethermint account for contracts
 	app.AccountKeeper = authkeeper.NewAccountKeeper(
-		appCodec, keys[authtypes.StoreKey], app.GetSubspace(authtypes.ModuleName), ethermint.ProtoAccount, maccPerms, sdk.GetConfig().GetBech32AccountAddrPrefix(),
+		appCodec, keys[authtypes.StoreKey], app.GetSubspace(authtypes.ModuleName), evmostypes.ProtoAccount, maccPerms, sdk.GetConfig().GetBech32AccountAddrPrefix(),
 	)
 	app.BankKeeper = bankkeeper.NewBaseKeeper(
 		appCodec, keys[banktypes.StoreKey], app.AccountKeeper, app.GetSubspace(banktypes.ModuleName), app.BlockedAddrs(),
@@ -458,7 +463,7 @@ func NewEvmos(
 	app.EvmKeeper = evmkeeper.NewKeeper(
 		appCodec, keys[evmtypes.StoreKey], tkeys[evmtypes.TransientKey], authtypes.NewModuleAddress(govtypes.ModuleName),
 		app.AccountKeeper, app.BankKeeper, &stakingKeeper, app.FeeMarketKeeper,
-		nil, geth.NewEVM, tracer, app.GetSubspace(evmtypes.ModuleName),
+		tracer, app.GetSubspace(evmtypes.ModuleName),
 	)
 
 	// Create IBC Keeper
@@ -495,7 +500,7 @@ func NewEvmos(
 
 	app.ClaimsKeeper = claimskeeper.NewKeeper(
 		appCodec, keys[claimstypes.StoreKey], authtypes.NewModuleAddress(govtypes.ModuleName),
-		app.AccountKeeper, app.BankKeeper, &stakingKeeper, app.DistrKeeper,
+		app.AccountKeeper, app.BankKeeper, &stakingKeeper, app.DistrKeeper, app.IBCKeeper.ChannelKeeper,
 	)
 
 	// register the staking hooks
@@ -821,26 +826,9 @@ func NewEvmos(
 	app.SetBeginBlocker(app.BeginBlocker)
 
 	maxGasWanted := cast.ToUint64(appOpts.Get(srvflags.EVMMaxTxGasWanted))
-	options := ante.HandlerOptions{
-		AccountKeeper:          app.AccountKeeper,
-		BankKeeper:             app.BankKeeper,
-		ExtensionOptionChecker: nil,
-		EvmKeeper:              app.EvmKeeper,
-		StakingKeeper:          app.StakingKeeper,
-		FeegrantKeeper:         app.FeeGrantKeeper,
-		IBCKeeper:              app.IBCKeeper,
-		FeeMarketKeeper:        app.FeeMarketKeeper,
-		SignModeHandler:        encodingConfig.TxConfig.SignModeHandler(),
-		SigGasConsumer:         SigVerificationGasConsumer,
-		Cdc:                    appCodec,
-		MaxTxGasWanted:         maxGasWanted,
-	}
 
-	if err := options.Validate(); err != nil {
-		panic(err)
-	}
-
-	app.SetAnteHandler(ante.NewAnteHandler(options))
+	app.setAnteHandler(encodingConfig.TxConfig, maxGasWanted)
+	app.setPostHandler()
 	app.SetEndBlocker(app.EndBlocker)
 	app.setupUpgradeHandlers()
 
@@ -866,6 +854,42 @@ func NewEvmos(
 
 // Name returns the name of the App
 func (app *Evmos) Name() string { return app.BaseApp.Name() }
+
+func (app *Evmos) setAnteHandler(txConfig client.TxConfig, maxGasWanted uint64) {
+	options := ante.HandlerOptions{
+		Cdc:                    app.appCodec,
+		AccountKeeper:          app.AccountKeeper,
+		BankKeeper:             app.BankKeeper,
+		ExtensionOptionChecker: evmostypes.HasDynamicFeeExtensionOption,
+		EvmKeeper:              app.EvmKeeper,
+		StakingKeeper:          app.StakingKeeper,
+		FeegrantKeeper:         app.FeeGrantKeeper,
+		DistributionKeeper:     app.DistrKeeper,
+		IBCKeeper:              app.IBCKeeper,
+		FeeMarketKeeper:        app.FeeMarketKeeper,
+		SignModeHandler:        txConfig.SignModeHandler(),
+		SigGasConsumer:         ante.SigVerificationGasConsumer,
+		MaxTxGasWanted:         maxGasWanted,
+		TxFeeChecker:           ethante.NewDynamicFeeChecker(app.EvmKeeper),
+	}
+
+	if err := options.Validate(); err != nil {
+		panic(err)
+	}
+
+	app.SetAnteHandler(ante.NewAnteHandler(options))
+}
+
+func (app *Evmos) setPostHandler() {
+	postHandler, err := posthandler.NewPostHandler(
+		posthandler.HandlerOptions{},
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	app.SetPostHandler(postHandler)
+}
 
 // BeginBlocker runs the Tendermint ABCI BeginBlock logic. It executes state changes at the beginning
 // of the new block for every registered module. If there is a registered fork at the current height,
@@ -1174,24 +1198,25 @@ func (app *Evmos) setupUpgradeHandlers() {
 		),
 	)
 
-	v11Handler := v11.CreateUpgradeHandler(
-		app.mm, app.configurator,
-		app.AccountKeeper,
-		app.BankKeeper,
-		app.StakingKeeper,
-		app.DistrKeeper,
-	)
-
-	// v11-rc3 upgrade handler
-	app.UpgradeKeeper.SetUpgradeHandler(
-		v11.UpgradeNameRC3,
-		v11Handler,
-	)
-
 	// v11 upgrade handler
 	app.UpgradeKeeper.SetUpgradeHandler(
 		v11.UpgradeName,
-		v11Handler,
+		v11.CreateUpgradeHandler(
+			app.mm, app.configurator,
+			app.AccountKeeper,
+			app.BankKeeper,
+			app.StakingKeeper,
+			app.DistrKeeper,
+		),
+	)
+
+	// v12 upgrade handler
+	app.UpgradeKeeper.SetUpgradeHandler(
+		v12.UpgradeName,
+		v12.CreateUpgradeHandler(
+			app.mm, app.configurator,
+			app.DistrKeeper,
+		),
 	)
 
 	// When a planned update height is reached, the old binary will panic
@@ -1228,18 +1253,14 @@ func (app *Evmos) setupUpgradeHandlers() {
 		// no store upgrade in v9 or v9.1
 	case v10.UpgradeName:
 		// no store upgrades in v10
-	case v11.UpgradeNameRC3:
-		// rename recovery store
-		storeUpgrades = &storetypes.StoreUpgrades{
-			Deleted: []string{"recovery"},
-			Added:   []string{recoverytypes.StoreKey},
-		}
 	case v11.UpgradeName:
-		// add ica host submodule
+		// add ica host submodule in v11
 		// initialize recovery store
 		storeUpgrades = &storetypes.StoreUpgrades{
 			Added: []string{icahosttypes.SubModuleName, recoverytypes.StoreKey},
 		}
+	case v12.UpgradeName:
+		// no store upgrades
 	}
 
 	if storeUpgrades != nil {

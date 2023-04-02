@@ -32,9 +32,9 @@ import (
 	host "github.com/cosmos/ibc-go/v6/modules/core/24-host"
 	"github.com/cosmos/ibc-go/v6/modules/core/exported"
 
-	"github.com/evmos/evmos/v11/ibc"
-	evmos "github.com/evmos/evmos/v11/types"
-	"github.com/evmos/evmos/v11/x/recovery/types"
+	"github.com/evmos/evmos/v12/ibc"
+	"github.com/evmos/evmos/v12/utils"
+	"github.com/evmos/evmos/v12/x/recovery/types"
 )
 
 // OnRecvPacket performs an IBC receive callback. It returns the tokens that
@@ -106,7 +106,7 @@ func (k Keeper) OnRecvPacket(
 	// Check if recipient pubkey is a supported key (eth_secp256k1, amino multisig,
 	// ed25519). Continue and return success ACK as the funds are not stuck on
 	// chain for supported keys
-	if account != nil && evmos.IsSupportedKey(account.GetPubKey()) {
+	if account != nil && utils.IsSupportedKey(account.GetPubKey()) {
 		return ack
 	}
 

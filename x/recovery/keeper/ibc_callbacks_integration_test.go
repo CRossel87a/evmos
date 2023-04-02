@@ -6,11 +6,12 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	transfertypes "github.com/cosmos/ibc-go/v6/modules/apps/transfer/types"
 	channeltypes "github.com/cosmos/ibc-go/v6/modules/core/04-channel/types"
-	"github.com/evmos/evmos/v11/app"
-	"github.com/evmos/evmos/v11/testutil"
-	teststypes "github.com/evmos/evmos/v11/types/tests"
-	claimstypes "github.com/evmos/evmos/v11/x/claims/types"
-	"github.com/evmos/evmos/v11/x/recovery/types"
+	"github.com/evmos/evmos/v12/app"
+	ibctesting "github.com/evmos/evmos/v12/ibc/testing"
+	"github.com/evmos/evmos/v12/testutil"
+	teststypes "github.com/evmos/evmos/v12/types/tests"
+	claimstypes "github.com/evmos/evmos/v12/x/claims/types"
+	"github.com/evmos/evmos/v12/x/recovery/types"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -36,7 +37,8 @@ var _ = Describe("Recovery: Performing an IBC Transfer", Ordered, func() {
 		BeforeEach(func() {
 			params := claimstypes.DefaultParams()
 			params.AuthorizedChannels = []string{}
-			s.EvmosChain.App.(*app.Evmos).ClaimsKeeper.SetParams(s.EvmosChain.GetContext(), params)
+			err := s.EvmosChain.App.(*app.Evmos).ClaimsKeeper.SetParams(s.EvmosChain.GetContext(), params)
+			s.Require().NoError(err)
 
 			sender = s.IBCOsmosisChain.SenderAccount.GetAddress().String()
 			receiver = s.EvmosChain.SenderAccount.GetAddress().String()
@@ -84,7 +86,7 @@ var _ = Describe("Recovery: Performing an IBC Transfer", Ordered, func() {
 				BeforeEach(func() {
 					params := types.DefaultParams()
 					params.EnableRecovery = false
-					s.EvmosChain.App.(*app.Evmos).RecoveryKeeper.SetParams(s.EvmosChain.GetContext(), params)
+					s.EvmosChain.App.(*app.Evmos).RecoveryKeeper.SetParams(s.EvmosChain.GetContext(), params) //nolint:errcheck
 				})
 
 				It("should not transfer or recover tokens", func() {
@@ -214,13 +216,13 @@ var _ = Describe("Recovery: Performing an IBC Transfer", Ordered, func() {
 					BeforeEach(func() {
 						params := types.DefaultParams()
 						params.EnableRecovery = false
-						s.EvmosChain.App.(*app.Evmos).RecoveryKeeper.SetParams(s.EvmosChain.GetContext(), params)
+						s.EvmosChain.App.(*app.Evmos).RecoveryKeeper.SetParams(s.EvmosChain.GetContext(), params) //nolint:errcheck
 
 						// Send uatom from Cosmos to Evmos
 						s.SendAndReceiveMessage(s.pathCosmosEvmos, s.IBCCosmosChain, coinAtom.Denom, coinAtom.Amount.Int64(), s.IBCCosmosChain.SenderAccount.GetAddress().String(), receiver, 1)
 
 						params.EnableRecovery = true
-						s.EvmosChain.App.(*app.Evmos).RecoveryKeeper.SetParams(s.EvmosChain.GetContext(), params)
+						s.EvmosChain.App.(*app.Evmos).RecoveryKeeper.SetParams(s.EvmosChain.GetContext(), params) //nolint:errcheck
 					})
 					It("should not recover tokens that originated from other chains", func() {
 						// Send uosmo from Osmosis to Evmos
@@ -277,13 +279,13 @@ var _ = Describe("Recovery: Performing an IBC Transfer", Ordered, func() {
 					BeforeEach(func() {
 						params := types.DefaultParams()
 						params.EnableRecovery = false
-						s.EvmosChain.App.(*app.Evmos).RecoveryKeeper.SetParams(s.EvmosChain.GetContext(), params)
-
+						err := s.EvmosChain.App.(*app.Evmos).RecoveryKeeper.SetParams(s.EvmosChain.GetContext(), params)
+						s.Require().NoError(err)
 						s.SendAndReceiveMessage(s.pathOsmosisCosmos, s.IBCCosmosChain, coinAtom.Denom, coinAtom.Amount.Int64(), s.IBCCosmosChain.SenderAccount.GetAddress().String(), receiver, 1)
 
 						// Send IBC transaction of 10 ibc/uatom
 						transferMsg := transfertypes.NewMsgTransfer(s.pathOsmosisEvmos.EndpointA.ChannelConfig.PortID, s.pathOsmosisEvmos.EndpointA.ChannelID, sdk.NewCoin(teststypes.UatomIbcdenom, sdk.NewInt(10)), sender, receiver, timeoutHeight, 0, "")
-						_, err := s.IBCOsmosisChain.SendMsgs(transferMsg)
+						_, err = ibctesting.SendMsgs(s.IBCOsmosisChain, ibctesting.DefaultFeeAmt, transferMsg)
 						s.Require().NoError(err) // message committed
 						transfer := transfertypes.NewFungibleTokenPacketData("transfer/channel-1/uatom", "10", sender, receiver, "")
 						packet := channeltypes.NewPacket(transfer.GetBytes(), 1, s.pathOsmosisEvmos.EndpointA.ChannelConfig.PortID, s.pathOsmosisEvmos.EndpointA.ChannelID, s.pathOsmosisEvmos.EndpointB.ChannelConfig.PortID, s.pathOsmosisEvmos.EndpointB.ChannelID, timeoutHeight, 0)
@@ -296,7 +298,7 @@ var _ = Describe("Recovery: Performing an IBC Transfer", Ordered, func() {
 						s.Require().Equal(osmoIBCAtom.Amount, coinAtom.Amount)
 
 						params.EnableRecovery = true
-						s.EvmosChain.App.(*app.Evmos).RecoveryKeeper.SetParams(s.EvmosChain.GetContext(), params)
+						s.EvmosChain.App.(*app.Evmos).RecoveryKeeper.SetParams(s.EvmosChain.GetContext(), params) //nolint:errcheck
 					})
 					It("should not recover tokens that originated from other chains", func() {
 						s.SendAndReceiveMessage(s.pathOsmosisEvmos, s.IBCOsmosisChain, "uosmo", 10, sender, receiver, 2)

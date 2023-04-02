@@ -24,9 +24,8 @@ import (
 	channeltypes "github.com/cosmos/ibc-go/v6/modules/core/04-channel/types"
 	"github.com/cosmos/ibc-go/v6/modules/core/exported"
 
-	"github.com/evmos/evmos/v11/ibc"
-	evmos "github.com/evmos/evmos/v11/types"
-	"github.com/evmos/evmos/v11/x/claims/types"
+	"github.com/evmos/evmos/v12/ibc"
+	"github.com/evmos/evmos/v12/x/claims/types"
 )
 
 // OnAcknowledgementPacket performs an IBC send callback. Once a user submits an
@@ -141,7 +140,7 @@ func (k Keeper) OnRecvPacket(
 			// -> return error acknowledgement to prevent funds from getting stuck
 			return channeltypes.NewErrorAcknowledgement(
 				errorsmod.Wrapf(
-					evmos.ErrKeyTypeNotSupported, "receiver address %s is not a valid ethereum address", recipientBech32,
+					types.ErrKeyTypeNotSupported, "receiver address %s is not a valid ethereum address", recipientBech32,
 				),
 			)
 		default:
@@ -192,7 +191,7 @@ func (k Keeper) OnRecvPacket(
 		// case 2: only the sender has a claims record
 		// -> migrate the sender record to the recipient address and claim IBC action
 
-		claimedAmt := sdk.ZeroInt() // nolint
+		claimedAmt := sdk.ZeroInt() //nolint
 		claimedAmt, err = k.ClaimCoinsForAction(ctx, recipient, senderClaimsRecord, types.ActionIBCTransfer, params)
 
 		// if the transfer fails or the claimable amount is 0 (eg: action already

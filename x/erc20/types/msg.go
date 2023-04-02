@@ -38,7 +38,7 @@ const (
 )
 
 // NewMsgConvertCoin creates a new instance of MsgConvertCoin
-func NewMsgConvertCoin(coin sdk.Coin, receiver common.Address, sender sdk.AccAddress) *MsgConvertCoin { // nolint: interfacer
+func NewMsgConvertCoin(coin sdk.Coin, receiver common.Address, sender sdk.AccAddress) *MsgConvertCoin { //nolint: interfacer
 	return &MsgConvertCoin{
 		Coin:     coin,
 		Receiver: receiver.Hex(),
@@ -85,7 +85,7 @@ func (msg MsgConvertCoin) GetSigners() []sdk.AccAddress {
 }
 
 // NewMsgConvertERC20 creates a new instance of MsgConvertERC20
-func NewMsgConvertERC20(amount math.Int, receiver sdk.AccAddress, contract, sender common.Address) *MsgConvertERC20 { // nolint: interfacer
+func NewMsgConvertERC20(amount math.Int, receiver sdk.AccAddress, contract, sender common.Address) *MsgConvertERC20 { //nolint: interfacer
 	return &MsgConvertERC20{
 		ContractAddress: contract.String(),
 		Amount:          amount,
@@ -141,11 +141,7 @@ func (m *MsgUpdateParams) ValidateBasic() error {
 		return errorsmod.Wrap(err, "Invalid authority address")
 	}
 
-	if err := m.Params.Validate(); err != nil {
-		return err
-	}
-
-	return nil
+	return m.Params.Validate()
 }
 
 // GetSignBytes implements the LegacyMsg interface.

@@ -31,18 +31,27 @@ import (
 	"github.com/ory/dockertest/v3/docker"
 )
 
-// Manager defines a docker pool instance, used to run and interact with evmos
-// node containers. It enables run, query, execute cli commands and purge.
+// Manager defines a docker pool instance, used to build, run, interact with and stop docker containers
+// running Evmos nodes.
 type Manager struct {
 	pool    *dockertest.Pool
 	network *dockertest.Network
 
-	CurrentNode     *dockertest.Resource
+	// CurrentNode stores the currently running docker container
+	CurrentNode *dockertest.Resource
+
+	// HeightBeforeStop stores the last block height that was reached before the last running node container
+	// was stopped
+	HeightBeforeStop int
+
+	// proposalCounter keeps track of the number of proposals that have been submitted
 	proposalCounter uint
+
+	// UpgradeHeight stores the upgrade height for the latest upgrade proposal that was submitted
+	UpgradeHeight uint
 }
 
-// NewManager creates new docker pool and network
-// returns Manager instance
+// NewManager creates new docker pool and network and returns a populated Manager instance
 func NewManager(networkName string) (*Manager, error) {
 	pool, err := dockertest.NewPool("")
 	if err != nil {
@@ -59,9 +68,10 @@ func NewManager(networkName string) (*Manager, error) {
 	}, nil
 }
 
-// BuildImage build docker image by provided path with <name>:<version> as name target
+// BuildImage builds a docker image to run in the provided context directory
+// with <name>:<version> as the image target
 func (m *Manager) BuildImage(name, version, dockerFile, contextDir string, args map[string]string) error {
-	buildArgs := []docker.BuildArg{}
+	buildArgs := make([]docker.BuildArg, 0, len(args))
 	for k, v := range args {
 		bArg := docker.BuildArg{
 			Name:  k,
@@ -73,6 +83,9 @@ func (m *Manager) BuildImage(name, version, dockerFile, contextDir string, args 
 		// local Dockerfile path
 		Dockerfile: dockerFile,
 		BuildArgs:  buildArgs,
+		// rebuild the image every time in case there were changes
+		// and the image is cached
+		NoCache: true,
 		// name with tag, e.g. evmos:v9.0.0
 		Name:         fmt.Sprintf("%s:%s", name, version),
 		OutputStream: io.Discard,
@@ -82,9 +95,10 @@ func (m *Manager) BuildImage(name, version, dockerFile, contextDir string, args 
 	return m.Client().BuildImage(opts)
 }
 
-// RunNode create docker container from provided node instance and run it.
-// Retry to get node JRPC server for 60 seconds to make sure node started properly.
-// On node start error returns container logs.
+// RunNode creates a docker container from the provided node instance and runs it.
+// To make sure the node started properly, get requests are sent to the JSON-RPC server repeatedly
+// with a timeout of 60 seconds.
+// In case the node fails to start, the container logs are returned along with the error.
 func (m *Manager) RunNode(node *Node) error {
 	var resource *dockertest.Resource
 	var err error
@@ -96,7 +110,12 @@ func (m *Manager) RunNode(node *Node) error {
 	}
 
 	if err != nil {
-		return err
+		stdOut, stdErr, _ := m.GetLogs(resource.Container.ID)
+		return fmt.Errorf(
+			"can't run container\n\n[error stream]:\n\n%s\n\n[output stream]:\n\n%s",
+			stdErr,
+			stdOut,
+		)
 	}
 
 	// trying to get JSON-RPC server, to make sure node started properly
@@ -104,27 +123,19 @@ func (m *Manager) RunNode(node *Node) error {
 	err = m.pool.Retry(
 		func() error {
 			// recreating container instance because resource.Container.State
-			// does not updateing properly by default
+			// does not update properly by default
 			c, err := m.Client().InspectContainer(resource.Container.ID)
 			if err != nil {
-				return err
+				return fmt.Errorf("can't inspect container: %s", err.Error())
 			}
 			// if node failed to start, i.e. ExitCode != 0, return container logs
 			if c.State.ExitCode != 0 {
-				var outBuf, errBuf bytes.Buffer
-				// no error check becuse success logs retieving returns error anyways
-				_ = m.Client().Logs(docker.LogsOptions{
-					Container:    resource.Container.ID,
-					OutputStream: &outBuf,
-					ErrorStream:  &errBuf,
-					Stdout:       true,
-					Stderr:       true,
-				})
+				stdOut, stdErr, _ := m.GetLogs(resource.Container.ID)
 				return fmt.Errorf(
 					"can't start evmos node, container exit code: %d\n\n[error stream]:\n\n%s\n\n[output stream]:\n\n%s",
 					c.State.ExitCode,
-					errBuf.String(),
-					outBuf.String(),
+					stdErr,
+					stdOut,
 				)
 			}
 			// get host:port for current container in local network
@@ -139,34 +150,67 @@ func (m *Manager) RunNode(node *Node) error {
 	)
 
 	if err != nil {
-		return err
+		stdOut, stdErr, _ := m.GetLogs(resource.Container.ID)
+		return fmt.Errorf(
+			"can't start node: %s\n\n[error stream]:\n\n%s\n\n[output stream]:\n\n%s",
+			err.Error(),
+			stdErr,
+			stdOut,
+		)
 	}
 	m.CurrentNode = resource
 	return nil
 }
 
-// WaitForHeight query evmos node every second until node will reach specified height
-// for 5 minutes, after time exceed returns error
-func (m *Manager) WaitForHeight(ctx context.Context, height int) error {
+// GetLogs returns the logs of the container with the provided containerID
+func (m *Manager) GetLogs(containerID string) (stdOut, stdErr string, err error) {
+	var outBuf, errBuf bytes.Buffer
+	opts := docker.LogsOptions{
+		Container:    containerID,
+		OutputStream: &outBuf,
+		ErrorStream:  &errBuf,
+		Stdout:       true,
+		Stderr:       true,
+	}
+	err = m.Client().Logs(opts)
+	if err != nil {
+		return "", "", fmt.Errorf("can't get logs: %s", err)
+	}
+	return outBuf.String(), errBuf.String(), nil
+}
+
+// WaitForHeight queries the Evmos node every second until the node will reach the specified height.
+// After 5 minutes this function times out and returns an error
+func (m *Manager) WaitForHeight(ctx context.Context, height int) (string, error) {
 	var currentHeight int
 	var err error
-	ticker := time.NewTicker(5 * time.Minute)
+	ticker := time.NewTicker(2 * time.Minute)
 	for {
 		select {
 		case <-ticker.C:
-			return fmt.Errorf("can't reach height %d, due: %w", height, err)
+			stdOut, stdErr, errLogs := m.GetLogs(m.ContainerID())
+			if errLogs != nil {
+				return "", fmt.Errorf("error while getting logs: %s", errLogs.Error())
+			}
+			return "", fmt.Errorf(
+				"can't reach height %d, due to: %s\nerror logs: %s\nout logs: %s",
+				height, err.Error(), stdOut, stdErr,
+			)
 		default:
-			currentHeight, err = m.nodeHeight(ctx)
+			currentHeight, err = m.GetNodeHeight(ctx)
 			if currentHeight >= height {
-				return nil
+				if err != nil {
+					return err.Error(), nil
+				}
+				return "", nil
 			}
 			time.Sleep(1 * time.Second)
 		}
 	}
 }
 
-// Makes system call to current node container environment with evmosd cli command to get current block height
-func (m *Manager) nodeHeight(ctx context.Context) (int, error) {
+// GetNodeHeight calls the Evmos CLI in the current node container to get the current block height
+func (m *Manager) GetNodeHeight(ctx context.Context) (int, error) {
 	exec, err := m.CreateExec([]string{"evmosd", "q", "block"}, m.ContainerID())
 	if err != nil {
 		return 0, fmt.Errorf("create exec error: %w", err)
@@ -181,7 +225,17 @@ func (m *Manager) nodeHeight(ctx context.Context) (int, error) {
 	if outStr != "<nil>" && outStr != "" {
 		index := strings.Index(outBuff.String(), "\"height\":")
 		qq := outStr[index+10 : index+12]
-		h, _ = strconv.Atoi(qq)
+		h, err = strconv.Atoi(qq)
+		// check if the conversion was possible
+		if err == nil {
+			// if conversion was possible but the errBuff is not empty, return the height along with an error
+			// this is necessary e.g. when the "duplicate proto" errors occur in the logs but the node is still
+			// producing blocks
+			if errBuff.String() != "" {
+				return h, fmt.Errorf("%s", errBuff.String())
+			}
+			return h, nil
+		}
 	}
 	if errBuff.String() != "" {
 		return 0, fmt.Errorf("evmos query error: %s", errBuff.String())
@@ -189,20 +243,44 @@ func (m *Manager) nodeHeight(ctx context.Context) (int, error) {
 	return h, nil
 }
 
-// ContainerID returns current running container ID
+// GetNodeVersion calls the Evmos CLI in the current node container to get the
+// current node version
+func (m *Manager) GetNodeVersion(ctx context.Context) (string, error) {
+	exec, err := m.CreateExec([]string{"evmosd", "version"}, m.ContainerID())
+	if err != nil {
+		return "", fmt.Errorf("create exec error: %w", err)
+	}
+	outBuff, errBuff, err := m.RunExec(ctx, exec)
+	if err != nil {
+		return "", fmt.Errorf("run exec error: %w", err)
+	}
+	if errBuff.String() != "" {
+		return "", fmt.Errorf("evmos version error: %s", errBuff.String())
+	}
+	return outBuff.String(), nil
+}
+
+// ContainerID returns the docker container ID of the currently running Node
 func (m *Manager) ContainerID() string {
 	return m.CurrentNode.Container.ID
 }
 
-// Docker client
+// The Client method returns the Docker client used by the Manager's pool
 func (m *Manager) Client() *docker.Client {
 	return m.pool.Client
 }
 
+// RemoveNetwork removes the Manager's used network from the pool
 func (m *Manager) RemoveNetwork() error {
 	return m.pool.RemoveNetwork(m.network)
 }
 
+// KillCurrentNode stops the execution of the currently used docker container
 func (m *Manager) KillCurrentNode() error {
+	heightBeforeStop, err := m.GetNodeHeight(context.Background())
+	if err != nil && heightBeforeStop == 0 {
+		return err
+	}
+	m.HeightBeforeStop = heightBeforeStop
 	return m.pool.Client.StopContainer(m.ContainerID(), 5)
 }

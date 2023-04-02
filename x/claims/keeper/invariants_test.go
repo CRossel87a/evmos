@@ -3,10 +3,9 @@ package keeper_test
 import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
-	"github.com/evmos/ethermint/tests"
-
-	"github.com/evmos/evmos/v11/testutil"
-	"github.com/evmos/evmos/v11/x/claims/types"
+	"github.com/evmos/evmos/v12/testutil"
+	utiltx "github.com/evmos/evmos/v12/testutil/tx"
+	"github.com/evmos/evmos/v12/x/claims/types"
 )
 
 func (suite *KeeperTestSuite) TestClaimsInvariant() {
@@ -18,14 +17,14 @@ func (suite *KeeperTestSuite) TestClaimsInvariant() {
 		{
 			"claims inactive",
 			func() {
-				suite.app.ClaimsKeeper.SetParams(suite.ctx, types.DefaultParams())
+				suite.app.ClaimsKeeper.SetParams(suite.ctx, types.DefaultParams()) //nolint:errcheck
 			},
 			false,
 		},
 		{
 			"invariant broken - single claim record (nothing completed)",
 			func() {
-				addr := sdk.AccAddress(tests.GenerateAddress().Bytes())
+				addr := sdk.AccAddress(utiltx.GenerateAddress().Bytes())
 				suite.app.ClaimsKeeper.SetClaimsRecord(suite.ctx, addr, types.NewClaimsRecord(sdk.NewInt(40)))
 				suite.Require().True(suite.app.ClaimsKeeper.HasClaimsRecord(suite.ctx, addr))
 
@@ -40,7 +39,7 @@ func (suite *KeeperTestSuite) TestClaimsInvariant() {
 		{
 			"invariant broken - single claim record (nothing completed), low value",
 			func() {
-				addr := sdk.AccAddress(tests.GenerateAddress().Bytes())
+				addr := sdk.AccAddress(utiltx.GenerateAddress().Bytes())
 				suite.app.ClaimsKeeper.SetClaimsRecord(suite.ctx, addr, types.NewClaimsRecord(sdk.OneInt()))
 				suite.Require().True(suite.app.ClaimsKeeper.HasClaimsRecord(suite.ctx, addr))
 
@@ -55,7 +54,7 @@ func (suite *KeeperTestSuite) TestClaimsInvariant() {
 		{
 			"invariant broken - single claim record (all completed)",
 			func() {
-				addr := sdk.AccAddress(tests.GenerateAddress().Bytes())
+				addr := sdk.AccAddress(utiltx.GenerateAddress().Bytes())
 				cr := types.ClaimsRecord{
 					InitialClaimableAmount: sdk.NewInt(100),
 					ActionsCompleted:       []bool{true, true, true, true},
@@ -74,7 +73,7 @@ func (suite *KeeperTestSuite) TestClaimsInvariant() {
 		{
 			"invariant NOT broken - single claim record",
 			func() {
-				addr := sdk.AccAddress(tests.GenerateAddress().Bytes())
+				addr := sdk.AccAddress(utiltx.GenerateAddress().Bytes())
 				cr := types.ClaimsRecord{
 					InitialClaimableAmount: sdk.NewInt(100),
 					ActionsCompleted:       []bool{false, false, false, false},
@@ -93,8 +92,8 @@ func (suite *KeeperTestSuite) TestClaimsInvariant() {
 		{
 			"invariant NOT broken - multiple claim records",
 			func() {
-				addr := sdk.AccAddress(tests.GenerateAddress().Bytes())
-				addr2 := sdk.AccAddress(tests.GenerateAddress().Bytes())
+				addr := sdk.AccAddress(utiltx.GenerateAddress().Bytes())
+				addr2 := sdk.AccAddress(utiltx.GenerateAddress().Bytes())
 				cr := types.ClaimsRecord{
 					InitialClaimableAmount: sdk.NewInt(100),
 					ActionsCompleted:       []bool{false, false, false, false},

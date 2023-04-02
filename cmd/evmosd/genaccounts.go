@@ -36,13 +36,13 @@ import (
 	"github.com/cosmos/cosmos-sdk/x/genutil"
 	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
 
-	ethermint "github.com/evmos/ethermint/types"
-	evmtypes "github.com/evmos/ethermint/x/evm/types"
+	"github.com/evmos/evmos/v12/types"
+	evmtypes "github.com/evmos/evmos/v12/x/evm/types"
 
-	evmoskr "github.com/evmos/evmos/v11/crypto/keyring"
+	evmoskr "github.com/evmos/evmos/v12/crypto/keyring"
 
-	vestingcli "github.com/evmos/evmos/v11/x/vesting/client/cli"
-	vestingtypes "github.com/evmos/evmos/v11/x/vesting/types"
+	vestingcli "github.com/evmos/evmos/v12/x/vesting/client/cli"
+	vestingtypes "github.com/evmos/evmos/v12/x/vesting/types"
 )
 
 const (
@@ -218,7 +218,7 @@ contain valid denominations. Accounts may optionally be supplied with vesting pa
 				)
 
 			default:
-				genAccount = &ethermint.EthAccount{
+				genAccount = &types.EthAccount{
 					BaseAccount: baseAccount,
 					CodeHash:    common.BytesToHash(evmtypes.EmptyCodeHash).Hex(),
 				}

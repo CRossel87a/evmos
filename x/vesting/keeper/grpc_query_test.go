@@ -6,9 +6,9 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 
-	"github.com/evmos/ethermint/tests"
-	"github.com/evmos/evmos/v11/testutil"
-	"github.com/evmos/evmos/v11/x/vesting/types"
+	"github.com/evmos/evmos/v12/testutil"
+	utiltx "github.com/evmos/evmos/v12/testutil/tx"
+	"github.com/evmos/evmos/v12/x/vesting/types"
 )
 
 func (suite *KeeperTestSuite) TestBalances() {
@@ -16,7 +16,7 @@ func (suite *KeeperTestSuite) TestBalances() {
 		req    *types.QueryBalancesRequest
 		expRes *types.QueryBalancesResponse
 	)
-	addr := sdk.AccAddress(tests.GenerateAddress().Bytes())
+	addr := sdk.AccAddress(utiltx.GenerateAddress().Bytes())
 
 	testCases := []struct {
 		name     string
@@ -99,6 +99,7 @@ func (suite *KeeperTestSuite) TestBalances() {
 			suite.SetupTest() // reset
 			ctx := sdk.WrapSDKContext(suite.ctx)
 			tc.malleate()
+			suite.Commit()
 
 			res, err := suite.queryClient.Balances(ctx, req)
 			if tc.expPass {
