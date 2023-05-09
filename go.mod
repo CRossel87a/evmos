@@ -15,9 +15,7 @@ require (
 	github.com/cosmos/ibc-go/v6 v6.1.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/ethereum/go-ethereum v1.10.26
-	github.com/evmos/ethermint v0.21.0
 	github.com/evmos/evmos-ledger-go v0.3.0-rc0
-	github.com/evmos/evmos/v11 v11.0.2
 	github.com/gogo/protobuf v1.3.3
 	github.com/golang/protobuf v1.5.3
 	github.com/gorilla/mux v1.8.0
@@ -230,5 +228,5 @@ replace (
 	// use cosmos flavored protobufs
 	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
 	// Informal Tendermint fork
-	github.com/tendermint/tendermint => github.com/CRossel87a/tendermint v0.34.25-0.20230402185437-0865964963ff
+	github.com/tendermint/tendermint => github.com/informalsystems/tendermint v0.34.26
 )
