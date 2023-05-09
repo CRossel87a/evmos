@@ -35,6 +35,18 @@ Ref: https://keepachangelog.com/en/1.0.0/
 
 # Changelog
 
+## [v12.1.2] - 2023-04-14
+
+### Bug Fixes
+
+- (rpc) [#1431](https://github.com/evmos/evmos/pull/1431) Fix websocket connection id parsing
+
+## [v12.1.1] - 2023-04-14
+
+### Improvements
+
+- (config) [#1513](https://github.com/evmos/evmos/pull/1513) Set default `timeout_commit` to `3s`
+
 ## [v12.1.0] - 2023-03-24
 
 ### State Machine Breaking
